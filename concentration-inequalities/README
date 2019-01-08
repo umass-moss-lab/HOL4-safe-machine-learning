@@ -1,0 +1,8 @@
+To verify the proofs in these HOL4 scripts:
+
+1) Install HOL4 (which may entail installing some version of the SML
+   programming language).  The HOL4 download page is here:
+
+    https://hol-theorem-prover.org/#get
+
+2) Run Holmake (it lives in the bin directory of your HOL4 installation).
