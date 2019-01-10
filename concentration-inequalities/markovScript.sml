@@ -10,9 +10,6 @@ open trivialTheory;
 
 val _ = new_theory "markov";
 
-fun assume_ispec (t:term) (th:thm) = ASSUME_TAC (ISPEC t th);
-fun assume_ispecl (tl:term list) (th:thm) = ASSUME_TAC (ISPECL tl th);
-
 val s_ep_def = Define ` s_ep f ep x = if (Normal ep) ≤ f x then (Normal ep) else 0`;
 val s_ep_indic_def = Define `s_ep_indic f ep = (λx. if x ∈ {y | (Normal ep) ≤ f y} then 1 else 0)`;
 

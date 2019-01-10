@@ -2,18 +2,19 @@ open HolKernel Parse boolLib bossLib;
 open realLib;
 
 open arithmeticTheory;
+open pred_setTheory;
+open realTheory;
+open transcTheory;
+open seqTheory;
+open limTheory;
+open extrealTheory;
 open measureTheory;
 open lebesgueTheory;
-open extrealTheory;
-open realTheory;
-open pred_setTheory;
-open transcTheory;
 open probabilityTheory;
-open limTheory;
-open seqTheory;
 
-open convexTheory;
 open trivialTheory;
+open convexTheory;
+open markovTheory;
 
 val _ = new_theory "hoeffding";
 
@@ -22,10 +23,6 @@ val L'_def = Define `L' (p : real) = (λh. - p + p * exp h/(1 - p + p * exp h))`
 val L''_def = Define `L'' (p : real) =
     (λh. p * exp h/(1 - p + p * exp h) * (1 - p * exp h/(1 - p + p * exp h)))`;
 val dL_def = Define `(dL p (0:num) = L p) ∧ (dL p (1:num) = L' p) ∧ (dL p (2:num) = L'' p)`;
-
-val closed_interval_def = Define `closed_interval a b = {x | a ≤ x ∧ x ≤ b}`;
-val almost_surely_def = Define `almost_surely p X s = ∀g. expectation p (g X) =
-    expectation p (λx. indicator_fn s (X x) * g X x)`;
 
 val L_0_EQ_0 = store_thm(
     "L_0_EQ_0",
@@ -601,6 +598,154 @@ val HOEFFDINGS_LEMMA = store_thm(
     `h * h / 8 = g * g * (b − a) * (b − a) / 8` suffices_by (strip_tac >> fs[le_lt,le_trans]) >>
     Q.UNABBREV_TAC `q` >> Q.UNABBREV_TAC `h` >> fs[real_div] >>
     metis_tac[REAL_MUL_ASSOC,REAL_MUL_COMM]
+);
+
+val HOEF_INEQ_LEM_1 = store_thm(
+    "HOEF_INEQ_LEM_1",
+    ``∀mu sp (s:real) (t:real) f. (0 < s) ⇒
+        (mu {x | Normal t ≤ f x ∧ x ∈ sp} =
+        mu {x | Normal (exp (s * t)) ≤ exp (Normal s * (f x)) ∧ x ∈ sp})``,
+    rpt strip_tac >>
+    `{x | Normal t ≤ f x ∧ x ∈ sp} =
+        {x | Normal (exp (s * t)) ≤ exp (Normal s * f x) ∧ x ∈ sp}` suffices_by fs[] >>
+    `∀x. (Normal t ≤ f x ∧ x ∈ sp) ⇔
+        (Normal (exp (s * t)) ≤ exp (Normal s * f x) ∧ x ∈ sp)` suffices_by fs[] >>
+    strip_tac >> Cases_on `x ∈ sp` >> fs[] >> pop_assum kall_tac >>
+    `Normal t ≤ f x ⇔ Normal s * (Normal t) ≤ Normal s * f x` by
+        (imp_res_tac le_lmul_real >> metis_tac[]) >>
+    fs[extreal_mul_def] >> pop_assum kall_tac >>
+    (qspecl_then [`Normal (s * t)`,`Normal s * f x`] assume_tac) ext_exp_mono_le >>
+    fs[extreal_exp_def]
+);
+
+val HOEF_INEQ_LEM_2 = store_thm(
+    "HOEF_INEQ_LEM_2",
+    ``∀sp sts mu n s t X. measure_space (sp,sts,mu) ∧
+        (∀i. i < n ⇒ real_random_variable (X i) (sp,sts,mu)) ⇒
+        (Normal (mu {x | Normal (exp (s * t)) ≤
+        exp (Normal s * ((sumfinfun (0,n) X) x −
+        integral (sp,sts,mu) (sumfinfun (0,n) X))) ∧ x ∈ sp}) ≤
+        1 / Normal (exp (s * t)) * integral (sp,sts,mu)
+        (λx. exp (Normal s * ((sumfinfun (0,n) X) x −
+        integral (sp,sts,mu) (sumfinfun (0,n) X)))))``,
+    NTAC 7 strip_tac >> Q.ABBREV_TAC `SX = sumfinfun (0,n) X` >>
+    Q.ABBREV_TAC `ESX = integral (sp,sts,mu) SX` >> rpt strip_tac >>
+    `0 < exp (s * t)` by fs[EXP_POS_LT] >>
+    `∀x. 0 ≤ (λx. exp (Normal s * (SX x − ESX))) x` by (strip_tac >> fs[ext_exp_pos_le]) >>
+    `measurable (sp,sts) Borel (λx. exp (Normal s * (SX x − ESX)))`
+        suffices_by (strip_tac >> imp_res_tac MARKOVS_INEQUALITY >> fs[]) >>
+    NTAC 2 (pop_assum kall_tac) >>
+    `(λx. exp (Normal s * (SX x − ESX))) ∈ measurable (sp,sts) Borel`
+        suffices_by (strip_tac >> fs[measurable_def]) >>
+    `(λx. Normal s * (SX x − ESX)) ∈ measurable (sp,sts) Borel`
+        suffices_by (strip_tac >> assume_tac EXP_MBL >> imp_res_tac MEASURABLE_COMP >>
+        `(λx. exp (Normal s * (SX x − ESX))) = exp ∘ (λx. Normal s * (SX x − ESX))`
+            suffices_by fs[] >>
+        `∀x. (λx. exp (Normal s * (SX x − ESX))) x = (exp ∘ (λx. Normal s * (SX x − ESX))) x`
+            suffices_by metis_tac[] >>
+        strip_tac >> fs[]) >>
+    `sigma_algebra (sp,sts)` by fs[measure_space_def,m_space_def,measurable_sets_def] >>
+    `(λx. SX x − ESX) ∈ measurable (sp,sts) Borel` suffices_by (strip_tac >>
+        imp_res_tac IN_MEASURABLE_BOREL_CMUL_ALT >> fs[]) >>
+    `SX ∈ measurable (sp,sts) Borel` suffices_by (strip_tac >>
+        `(λx. ESX) ∈ measurable (sp,sts) Borel` by fs[IN_MEASURABLE_BOREL_CONST_ALT] >>
+        (qspecl_then [`(sp,sts)`,`SX`,`(λx. ESX)`] assume_tac) IN_MEASURABLE_BOREL_SUB_ALT >>
+        pop_assum imp_res_tac >> fs[]) >>
+    Q.UNABBREV_TAC `ESX` >> Q.UNABBREV_TAC `SX` >>
+    `∀i. i < n ⇒ X i ∈ measurable (sp,sts) Borel` by (rpt strip_tac >> RES_TAC >>
+        fs[real_random_variable_def,p_space_def,m_space_def,events_def,measurable_sets_def]) >>
+    imp_res_tac IN_MEASURABLE_BOREL_SUMFINFUN
+);
+
+val HOEF_INEQ_LEM_5 = store_thm(
+    "HOEF_INEQ_LEM_5",
+    ``∀n X a b s t. Normal (exp (-(s * t))) *
+        prodfin (0,n) (λi. Normal (exp (s * s * (b i − a i) * (b i − a i) / 8))) =
+        Normal (exp (-(s * t) + s * s / 8 * sum (0,n) (λi. (b i − a i) * (b i − a i))))``,
+    rpt strip_tac >>
+    (qspecl_then [`λi. s * s * (b i − a i) * (b i − a i) / 8`,`n`] assume_tac) exp_sum >>
+    fs[] >> pop_assum kall_tac >>
+    (qspecl_then [`λi. s * s * (b i − a i) * (b i − a i) / 8`,`n`] assume_tac) sumfin_normal >>
+    fs[extreal_exp_def,extreal_mul_def] >> pop_assum kall_tac >> fs[EXP_ADD] >>
+    `sum (0,n) (λi. s * s * (b i − a i) * (b i − a i) / 8) =
+        s * s / 8 * sum (0,n) (λi. (b i − a i) * (b i − a i))` suffices_by fs[] >>
+    `(λi. s * s * (b i − a i) * (b i − a i) / 8) =
+        (λi. s * s / 8 * (b i − a i) * (b i − a i))`
+        by (fs[real_div] >> metis_tac[REAL_MUL_COMM,REAL_MUL_ASSOC]) >>
+    fs[] >> pop_assum kall_tac >>
+    (qspecl_then [`λi. (b i − a i) * (b i − a i)`,`s * s / 8`,`0`,`n`] assume_tac) SUM_CMUL >>
+    fs[REAL_MUL_ASSOC]
+);
+
+val HOEF_INEQ_LEM_6 = store_thm(
+    "HOEF_INEQ_LEM_6",
+    ``∀p n X a b t. (prob_space p) ∧ (0 < t) ∧ (∀i. i < n ⇒ real_random_variable (X i) p) ∧
+        (sum (0,n) (λi. (b i − a i) * (b i − a i)) = 0) ∧
+        (∀i. i < n ⇒ (expectation p (X i) ≠ PosInf) ∧ (expectation p (X i) ≠ NegInf)) ∧
+        (∀i. i < n ⇒ probably p {x | (X i) x ∈ closed_interval (Normal (a i)) (Normal (b i))}) ⇒
+        (measure p {x | Normal t ≤
+        (sumfinfun (0,n) X) x − (integral p (sumfinfun (0,n) X)) ∧ x ∈ m_space p} = 0)``,
+    NTAC 6 strip_tac >> Q.ABBREV_TAC `sp = m_space p` >>
+    Q.ABBREV_TAC `sts = measurable_sets p` >> Q.ABBREV_TAC `mu = measure p` >>
+    Q.ABBREV_TAC `SX = sumfinfun (0,n) X` >> Q.ABBREV_TAC `ESX = integral p SX` >> strip_tac >>
+    `∀i. (i < n) ⇒ (0 ≤ (λi. (b i − a i) * (b i − a i)) i)`
+        by (rpt strip_tac >> fs[REAL_LE_SQUARE]) >>
+    imp_res_tac SUM_OF_POS_EQ_0 >> pop_assum kall_tac >> fs[] >> rw[] >>
+    qpat_x_assum `sum _ _ = _` kall_tac >> fs[closed_interval_point] >>
+    `∀i. i < n ⇒ integrable p (X i)` by (rpt strip_tac >> RES_TAC >>
+        fs[prob_space_def,expectation_def,real_random_variable_def,p_space_def,events_def] >>
+        Cases_on `integral p (X i)` >> fs[] >> rw[] >>
+        NTAC 4 (qpat_x_assum `∀i. i < n ⇒ _` kall_tac) >> rfs[] >>
+        assume_tac INTEGRAL_FINITE_IMP_IBL >> rfs[]) >>
+    `integral p (sumfinfun (0,n) X) = sumfin (0,n) (λi. integral p (X i))`
+        by (fs[prob_space_def,p_space_def] >> imp_res_tac integral_sumfinfun >> rfs[]) >>
+    Q.UNABBREV_TAC `SX` >> fs[] >> pop_assum kall_tac >>
+    `∀i. i < n ⇒ (integral p (X i) = Normal (a i))` by (rpt strip_tac >> RES_TAC >>
+        NTAC 5 (qpat_x_assum `∀i. i < n ⇒ _` kall_tac) >>
+        fs[real_random_variable_def,p_space_def,events_def] >> rw[] >>
+        imp_res_tac PSPACE_MBL_IMP_EXP_EQ_EXP_AS >>
+        fs[expectation_def] >> pop_assum kall_tac >>
+        `(λx. indicator_fn {x | X i x = Normal (a i)} x * X i x) =
+            (λx.  Normal (a i) * indicator_fn {x | X i x = Normal (a i)} x)`
+            by (`∀x. (λx. indicator_fn {x | X i x = Normal (a i)} x * X i x) x =
+                (λx.  Normal (a i) * indicator_fn {x | X i x = Normal (a i)} x) x` suffices_by fs[] >>
+            strip_tac >> fs[indicator_fn_def] >> Cases_on `X i x = Normal (a i)` >>
+            fs[mul_lzero,mul_rzero,mul_lone,mul_rone]) >>
+        fs[] >> pop_assum kall_tac >> rfs[probably_def,prob_def,events_def] >>
+        (qspecl_then [`p`,`{x | X i x = Normal (a i)}`,`a i`] assume_tac) integral_cmul_indicator >>
+        rfs[prob_space_def]) >>
+    (qspecl_then [`n`,`(λi. integral p (X i))`,`(λi. Normal (a i))`] assume_tac) sumfin_replace >>
+    fs[sumfin_normal] >> pop_assum kall_tac >> Q.UNABBREV_TAC `ESX` >>
+    imp_res_tac sumfinfun_probably >> rfs[] >>
+    Q.ABBREV_TAC `SX = sumfinfun (0,n) X` >> Q.ABBREV_TAC `Sa = sum (0,n) a` >>
+    `{x | (SX x = Normal Sa) ∧ x ∈ sp} = {x | (SX x - Normal Sa = 0) ∧ x ∈ sp}` by (
+        fs[EXTENSION] >> strip_tac >>
+        `(SX x = Normal Sa) ⇔ (SX x − Normal Sa = 0)` suffices_by metis_tac[] >>
+        EQ_TAC >> fs[sub_0] >> strip_tac >> fs[extreal_sub_def,N0_EQ_0]) >>
+    fs[] >> pop_assum kall_tac >>
+    `(λx. SX x − Normal Sa) ∈ measurable (sp,sts) Borel` by (
+        `sigma_algebra (m_space p,measurable_sets p)` by fs[prob_space_def,measure_space_def] >>
+        `sumfinfun (0,n) X ∈ measurable (m_space p,measurable_sets p) Borel` by (
+            imp_res_tac IN_MEASURABLE_BOREL_SUMFINFUN >>
+            fs[real_random_variable_def,p_space_def,events_def]) >>
+        rfs[] >> `(λx. Normal Sa) ∈ measurable (sp,sts) Borel` by fs[IN_MEASURABLE_BOREL_CONST_ALT] >>
+        (qspecl_then [`(sp,sts)`,`SX`,`(λx. Normal Sa)`] assume_tac) IN_MEASURABLE_BOREL_SUB_ALT >>
+        rfs[]) >>
+    `{x | SX x − Normal Sa < Normal t ∧ x ∈ sp} ∈ events p` by (fs[events_def] >>
+        imp_res_tac IN_MEASURABLE_BOREL_ALL >> rfs[INTER_DEF,space_def,subsets_def]) >>
+    `{x | (SX x − Normal Sa = 0) ∧ x ∈ sp} ⊆ {x | SX x − Normal Sa < Normal t ∧ x ∈ sp}` by (
+        fs[SUBSET_DEF] >> rpt strip_tac >>
+        `Normal 0 < Normal t` suffices_by fs[N0_EQ_0] >>
+        fs[extreal_lt_alt]) >>
+    imp_res_tac probably_subset >> pop_assum kall_tac >>
+    imp_res_tac propably_comp_null >> pop_assum kall_tac >>
+    rfs[null_set_def,p_space_def] >>
+    `sp DIFF {x | SX x − Normal Sa < Normal t ∧ x ∈ sp} =
+        {x | Normal t ≤ SX x − Normal Sa ∧ x ∈ sp}` suffices_by (strip_tac >> fs[]) >>
+    fs[DIFF_DEF,EXTENSION] >> strip_tac >> rpt (pop_assum kall_tac) >>
+    `¬(SX x − Normal Sa < Normal t) ⇔ Normal t ≤ SX x − Normal Sa`
+        suffices_by (strip_tac >> metis_tac[]) >>
+    Cases_on `SX x` >> fs[extreal_sub_def,extreal_lt_alt,extreal_le_def,real_lte]
 );
 
 val _ = export_theory();
