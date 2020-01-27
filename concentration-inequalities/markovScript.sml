@@ -1,11 +1,9 @@
 open HolKernel Parse boolLib bossLib;
-
-open measureTheory;
-open lebesgueTheory;
-open extrealTheory;
-open realTheory;
 open pred_setTheory;
-
+open realTheory;
+open c487306_extrealTheory;
+open c487306_measureTheory;
+open c487306_lebesgueTheory;
 open trivialTheory;
 
 val _ = new_theory "markov";
@@ -16,7 +14,7 @@ val s_ep_indic_def = Define `s_ep_indic f ep = (λx. if x ∈ {y | (Normal ep) �
 val ALGEBRA_LEMMMA_1 = store_thm(
     "ALGEBRA_LEMMMA_1",
     ``∀a b c d. ((0 < a:extreal) ∧ (a ≠ PosInf)) ⇒ ((b ≤ (1/a) * c) ∧ (c ≤ d) ⇒ (b ≤ (1/a) * d))``,
-    rpt strip_tac >> imp_res_tac inv_pos >> imp_res_tac le_rmul_imp >> NTAC 5 (pop_assum kall_tac) >>
+    rw[] >> imp_res_tac inv_pos >> imp_res_tac le_rmul_imp >> NTAC 5 (pop_assum kall_tac) >>
     `(1 / a) * c ≤ (1 / a) * d` by fs[mul_comm] >> metis_tac[le_trans]
 );
 
@@ -61,13 +59,11 @@ val S_EP_INDIC_MONO = store_thm(
         ((λx. Normal ep * indicator_fn {x | Normal ep ≤ f x ∧ x ∈ X} x) x ≤ f x)``,
     rpt strip_tac >> fs[indicator_fn_def] >>
     Cases_on `x ∈ X` >> fs[]
-    >- (
-        `(λx. Normal ep * indicator_fn {x | Normal ep ≤ f x} x) x ≤ f x`
+    >- (`(λx. Normal ep * indicator_fn {x | Normal ep ≤ f x} x) x ≤ f x`
             suffices_by fs[indicator_fn_def] >>
         imp_res_tac S_EP_MONO >>
         first_x_assum (qspec_then `x` assume_tac) >>
-        fs[S_EP_EQ_INDIC,S_EP_INDIC_IS_INDIC]
-    )
+        fs[S_EP_EQ_INDIC,S_EP_INDIC_IS_INDIC])
     >- (fs[mul_rzero])
 );
 
